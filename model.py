@@ -176,8 +176,14 @@ class Seq2SeqModel:
                 dtype=self.dtype,
                 time_major=False,
             )
+            self.content_outputs_fw, self.content_outputs_bw = self.pre_last_state_fw_bw
+            initial_state_fw = [state for state in self.content_outputs_fw]
+            initial_state_bw = [state for state in self.content_outputs_bw]
+            self.keyword_initial_state_fw = tuple(initial_state_fw)
+            self.keyword_initial_state_bw = tuple(initial_state_bw)
             self.pre_outputs_fw, self.pre_outputs_bw = self.pre_outputs_fw_bw
             self.content_outputs = tf.concat([self.pre_outputs_fw, self.pre_outputs_bw], 2)
+
     def build_keyword_encoder(self):
         print( 'Building keyword_encoder...')
         with tf.variable_scope('encoder'):
@@ -187,6 +193,7 @@ class Seq2SeqModel:
                 ids=self.keyword_inputs
             )
             # TODO(sdsuo): Decide if we need a Dense input layer here
+
             if self.bidirectional:
                 # Build encoder cell
                 self.encoder_cell_fw = self.build_rnn_depth_cell()
@@ -201,6 +208,8 @@ class Seq2SeqModel:
                     sequence_length=self.keyword_length,
                     dtype=self.dtype,
                     time_major=False,
+                    initial_state_fw=self.keyword_initial_state_fw,
+                    initial_state_bw=self.keyword_initial_state_bw
                 )
                 self.encoder_last_state_fw, self.encoder_last_state_bw = self.encoder_last_state_fw_bw
                 encoder_last_state_zipped = zip(self.encoder_last_state_fw, self.encoder_last_state_bw)
@@ -520,7 +529,7 @@ class Seq2SeqModel:
         input_batch_size = content_inputs.shape[0]
         if input_batch_size != content_inputs_length.shape[0]:
             raise ValueError("Encoder inputs and their lengths must be equal in their "
-                "batch_size, %d != %d" % (input_batch_size, content_inputs_length.shape[0]))
+                "batch_size, %d != %d" % (input_batch_size, encoder_inputs_length.shape[0]))
 
         if not predict:
             target_batch_size = decoder_inputs.shape[0]
